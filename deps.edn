@@ -1,7 +1,8 @@
 {:paths ["src" "resources"]
 
  :deps
- {org.clojure/clojure {:mvn/version "1.12.5"}}
+ {org.clojure/clojure {:mvn/version "1.12.5"}
+  xyz.triplox/triplox {:mvn/version "0.1.0-SNAPSHOT"}}
 
  :aliases
  {:dev

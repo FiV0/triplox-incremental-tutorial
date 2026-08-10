@@ -1,23 +1,19 @@
-# {project}
+# Triplox incremental query tutorial
 
-Executing the program can either be done via
-```sh
-clj -M -m main :arg1 :arg2
-```
-or by compiling a jar via
-```sh
-clj -T:build clean
-clj -T:build jar
-```
-and executing it via
-```sh
-java -jar target/lib-0.1.4.jar :arg1 :arg2
+This repository is a little incremental query tutorial for [Triplox](https://github.com/FiV0/triplox), an Datomic-like
+triplestore on top of [SlateDB](https://github.com/slatedb/slatedb).
+
+Please check that the version below matches the newest release of Triplox and replace it accordingly.
+
+You first need a running docker image of Triplox
+```bash
+docker pull ghcr.io/fiv0/triplox:0.1.0-alpha.7
+docker run -p 5490:5490 ghcr.io/fiv0/triplox:0.1.0-alpha.7
 ```
 
-### Testing
-
-```sh
-clj -X:test
+In case you want a persistent node, start the image with
+```bash
+docker run -p 5490:5490 -e TRIPLOX_STORAGE=local -v triplox-data:/var/lib/triplox  ghcr.io/fiv0/triplox:0.1.0-alpha.7
 ```
 
 ## License
