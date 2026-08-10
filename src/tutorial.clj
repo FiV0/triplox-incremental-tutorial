@@ -82,7 +82,7 @@
 ;; one user being in both teams of sizes 3 and 2 respectively. Let us first subscribe to
 ;; and incremental query that gives us user team pairs.
 
-(def user+team-sub
+(def !user+team-sub
   (tc/subscribe conn '{:find [?user-name ?team-name]
                        :where [[?user :user/name ?user-name]
                                [?user :user/team ?team]
@@ -128,7 +128,7 @@
 
 ;; As expected Grace Hopper appears twice. Let us now inspect initialization delta of the incremental query.
 
-(tc/take! user+team-sub 500)
+(tc/take! !user+team-sub 500)
 ;; => [[["Ada Lovelace" "Frontend"] 1]
 ;;     [["Alan Turing" "Frontend"] 1]
 ;;     [["Edsger Dijkstra" "Backend"] 1]
@@ -140,7 +140,7 @@
 
 (tc/transact conn [[:db/retract [:team/name "Frontend"] :team/name "Frontend"]])
 
-(tc/take! user+team-sub 500)
+(tc/take! !user+team-sub 500)
 ;; => [[["Ada Lovelace" "Frontend"] -1]
 ;;     [["Alan Turing" "Frontend"] -1]
 ;;     [["Grace Hopper" "Frontend"] -1]]
@@ -152,7 +152,7 @@
 ;; Let us now create a query that uses predicates and functions. It gets the issues
 ;; with a high priority, their assignee and the corresponding SLA response time in hours.
 
-(def urgent-issues-sub
+(def !urgent-issues-sub
   (tc/subscribe
    conn
    '{:find [?title ?assignee-name ?sla-hours]
@@ -164,32 +164,32 @@
              [(* ?priority 24) ?sla-hours]]}))
 
 (tc/transact conn
-             [{:issue/key "issue-1"
+             [{:issue/key "TPX-1"
                :issue/title "Sync engine drops updates on reconnect"
                :issue/priority 1
                :issue/assignee [:user/handle "ada"]}
-              {:issue/key "issue-2"
+              {:issue/key "TPX-2"
                :issue/title "Add dark mode to the dashboard"
                :issue/priority 4
                :issue/assignee [:user/handle "alan"]}
-              {:issue/key "issue-3"
+              {:issue/key "TPX-3"
                :issue/title "Incremental joins allocate per delta"
                :issue/priority 2
                :issue/assignee [:user/handle "grace"]}
-              {:issue/key "issue-4"
+              {:issue/key "TPX-4"
                :issue/title "Document the tutorial schema"
                :issue/priority 5
                :issue/assignee [:user/handle "edsger"]}
-              {:issue/key "issue-5"
+              {:issue/key "TPX-5"
                :issue/title "WAL replay is quadratic"
                :issue/priority 1
                :issue/assignee [:user/handle "grace"]}
-              {:issue/key "issue-6"
+              {:issue/key "TPX-6"
                :issue/title "Flaky test in the bid pipeline"
                :issue/priority 3
                :issue/assignee [:user/handle "alan"]}])
 
-(tc/take! urgent-issues-sub)
+(tc/take! !urgent-issues-sub)
 ;; => [[["Incremental joins allocate per delta" "Grace Hopper" 48] 1]
 ;;     [["Sync engine drops updates on reconnect" "Ada Lovelace" 24] 1]
 ;;     [["WAL replay is quadratic" "Grace Hopper" 24] 1]]
@@ -200,11 +200,40 @@
 (tc/transact conn [[:db/add [:issue/key "issue-6"] :issue/priority 2]
                    [:db/add [:issue/key "issue-3"] :issue/priority 4]])
 
-(tc/take! urgent-issues-sub)
+(tc/take! !urgent-issues-sub)
 ;; => [[["Flaky test in the bid pipeline" "Alan Turing" 48] 1]
 ;;     [["Incremental joins allocate per delta" "Grace Hopper" 48] -1]]
 
 ;; The flaky tests enters the and "incremental join allocations" exists the urgent tickets.
+
+;; *OR*
+
+;; Let us add the status for the issues and subscribe the active issues.
+
+(tc/transact conn
+             [[:db/add [:issue/key "TPX-1"] :issue/status :status/open]
+              [:db/add [:issue/key "TPX-2"] :issue/status :status/open]
+              [:db/add [:issue/key "TPX-3"] :issue/status :status/open]
+              [:db/add [:issue/key "TPX-4"] :issue/status :status/closed]
+              [:db/add [:issue/key "TPX-5"] :issue/status :status/in-progress]
+              [:db/add [:issue/key "TPX-6"] :issue/status :status/in-progress]])
+
+(tc/q (tc/db conn)
+      '{:find [?title ?status]
+        :where [[?i :issue/title ?title]
+
+                (or [?i :issue/status :status/open]
+                    [?i :issue/status :status/in-progress])]})
+
+;; TODO: Add support for ident constants in ref-value position.
+(def !active-sub
+  (tc/subscribe conn '{:find [?title]
+                       :where [[?i :issue/title ?title]
+                               #_(or [?i :issue/status :status/open]
+                                     [?i :issue/status :status/in-progress])]}))
+
+(tc/take! !active-sub)
+
 
 ;; *AGGREGATES + OR-JOIN + NOT-JOIN*
 
