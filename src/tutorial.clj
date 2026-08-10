@@ -208,7 +208,7 @@
 
 ;; *OR*
 
-;; Let us add the status for the issues and subscribe the active issues.
+;; Let us add the status for the issues and subscribe to the active issues.
 
 (tc/transact conn
              [[:db/add [:issue/key "TPX-1"] :issue/status :status/open]
@@ -218,22 +218,34 @@
               [:db/add [:issue/key "TPX-5"] :issue/status :status/in-progress]
               [:db/add [:issue/key "TPX-6"] :issue/status :status/in-progress]])
 
-(tc/q (tc/db conn)
-      '{:find [?title ?status]
-        :where [[?i :issue/title ?title]
-
-                (or [?i :issue/status :status/open]
-                    [?i :issue/status :status/in-progress])]})
-
-;; TODO: Add support for ident constants in ref-value position.
 (def !active-sub
   (tc/subscribe conn '{:find [?title]
                        :where [[?i :issue/title ?title]
-                               #_(or [?i :issue/status :status/open]
-                                     [?i :issue/status :status/in-progress])]}))
+                               ;; TODO replace once https://github.com/FiV0/triplox/issues/313 goes in
+                               #_
+                               (or [?i :issue/status :status/open]
+                                   [?i :issue/status :status/in-progress])
+                               [?i :issue/status ?status]
+                               (or [?status :db/ident :status/open]
+                                   [?status :db/ident :status/in-progress])]}))
 
 (tc/take! !active-sub)
+;; => [[["Add dark mode to the dashboard"] 1]
+;;     [["Flaky test in the bid pipeline"] 1]
+;;     [["Incremental joins allocate per delta"] 1]
+;;     [["Sync engine drops updates on reconnect"] 1]
+;;     [["WAL replay is quadratic"] 1]]
 
+;; First we all active queries. Let us now change an open to in-progress and a in-progress to closed.
+
+(tc/transact conn [[:db/add [:issue/key "TPX-1"] :issue/status :status/in-progress]
+                   [:db/add [:issue/key "TPX-5"] :issue/status :status/closed]])
+
+(tc/take! !active-sub)
+;; => [[["WAL replay is quadratic"] -1]]
+
+;; "WAL replay" was closed hence exists the active set where as "Sync engine drops updates on reconnect" changes status, but
+;; doesn't leave or enter the active set.
 
 ;; *AGGREGATES + OR-JOIN + NOT-JOIN*
 
