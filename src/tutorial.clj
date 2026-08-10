@@ -30,6 +30,10 @@
     :db/unique :db.unique/identity}
 
    ;; issues
+   {:db/ident :issue/key
+    :db/valueType :db.type/string
+    :db/cardinality :db.cardinality/one
+    :db/unique :db.unique/identity}
    {:db/ident :issue/title
     :db/valueType :db.type/string
     :db/cardinality :db.cardinality/one}
@@ -72,7 +76,7 @@
 ;; Queries
 ;; --------------------------------------------------------------------------
 
-;; *joins and unification*
+;; *JOINS and UNIFICATION*
 
 ;; Let us first add some users and teams. We are going to add 4 users and 2 teams, with
 ;; one user being in both teams of sizes 3 and 2 respectively. Let us first subscribe to
@@ -142,6 +146,70 @@
 ;;     [["Grace Hopper" "Frontend"] -1]]
 
 ;; All person + team pairs that were part of the frontend team were removed.
+
+;; *PREDICATES and FUNCTIONS*
+
+;; Let us now create a query that uses predicates and functions. It gets the issues
+;; with a high priority, their assignee and the corresponding SLA response time in hours.
+
+(def urgent-issues-sub
+  (tc/subscribe
+   conn
+   '{:find [?title ?assignee-name ?sla-hours]
+     :where [[?issue :issue/title ?title]
+             [?issue :issue/priority ?priority]
+             [(<= ?priority 2)]
+             [?issue :issue/assignee ?assignee]
+             [?assignee :user/name ?assignee-name]
+             [(* ?priority 24) ?sla-hours]]}))
+
+(tc/transact conn
+             [{:issue/key "issue-1"
+               :issue/title "Sync engine drops updates on reconnect"
+               :issue/priority 1
+               :issue/assignee [:user/handle "ada"]}
+              {:issue/key "issue-2"
+               :issue/title "Add dark mode to the dashboard"
+               :issue/priority 4
+               :issue/assignee [:user/handle "alan"]}
+              {:issue/key "issue-3"
+               :issue/title "Incremental joins allocate per delta"
+               :issue/priority 2
+               :issue/assignee [:user/handle "grace"]}
+              {:issue/key "issue-4"
+               :issue/title "Document the tutorial schema"
+               :issue/priority 5
+               :issue/assignee [:user/handle "edsger"]}
+              {:issue/key "issue-5"
+               :issue/title "WAL replay is quadratic"
+               :issue/priority 1
+               :issue/assignee [:user/handle "grace"]}
+              {:issue/key "issue-6"
+               :issue/title "Flaky test in the bid pipeline"
+               :issue/priority 3
+               :issue/assignee [:user/handle "alan"]}])
+
+(tc/take! urgent-issues-sub)
+;; => [[["Incremental joins allocate per delta" "Grace Hopper" 48] 1]
+;;     [["Sync engine drops updates on reconnect" "Ada Lovelace" 24] 1]
+;;     [["WAL replay is quadratic" "Grace Hopper" 24] 1]]
+
+;; The inc query initialization gives us the same results at the standard query. Let's say we
+;; now prioritize the flake test and deprioritize the incremental join allocations.
+
+(tc/transact conn [[:db/add [:issue/key "issue-6"] :issue/priority 2]
+                   [:db/add [:issue/key "issue-3"] :issue/priority 4]])
+
+(tc/take! urgent-issues-sub)
+;; => [[["Flaky test in the bid pipeline" "Alan Turing" 48] 1]
+;;     [["Incremental joins allocate per delta" "Grace Hopper" 48] -1]]
+
+;; The flaky tests enters the and "incremental join allocations" exists the urgent tickets.
+
+;; *AGGREGATES + OR-JOIN + NOT-JOIN*
+
+;; TODO
+;; We currently don't support aggregates, or-join and not-join, but they will come.
 
 ;; --------------------------------------------------------------------------
 ;; Views
