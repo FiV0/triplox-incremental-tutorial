@@ -7,8 +7,8 @@
 ;; Schema definition
 ;; --------------------------------------------------------------------------
 
-;; We are going to consider a minimal issue tracker with the entity types user,
-;; team, issue, status and comments.
+;; We are going to consider a minimal issue tracker with the entity types `user`,
+;; `team`, `issue` and `status`.
 
 (def schema
   ;; users
@@ -56,18 +56,7 @@
    ;; status enum
    {:db/ident :status/open}
    {:db/ident :status/in-progress}
-   {:db/ident :status/closed}
-
-   ;; comments
-   {:db/ident :comment/issue
-    :db/valueType :db.type/ref
-    :db/cardinality :db.cardinality/one}
-   {:db/ident :comment/author
-    :db/valueType :db.type/ref
-    :db/cardinality :db.cardinality/one}
-   {:db/ident :comment/body
-    :db/valueType :db.type/string
-    :db/cardinality :db.cardinality/one}])
+   {:db/ident :status/closed}])
 
 ;; commit the schema
 (tc/transact conn schema)
@@ -246,6 +235,36 @@
 
 ;; "WAL replay" was closed hence exists the active set where as "Sync engine drops updates on reconnect" changes status, but
 ;; doesn't leave or enter the active set.
+
+;; *NOT*
+
+;; To illustrate the `not` clause, let us observe tickets that are not clsoed yet.
+
+(def !not-closed-sub
+  (tc/subscribe conn '{:find [?title]
+                       :where [[?i :issue/title ?title]
+                               [?i :issue/status ?status]
+                               (not [?status :db/ident :status/closed])]}))
+
+(tc/take! !not-closed-sub)
+;; => [[["Add dark mode to the dashboard"] 1]
+;;     [["Flaky test in the bid pipeline"] 1]
+;;     [["Incremental joins allocate per delta"] 1]
+;;     [["Sync engine drops updates on reconnect"] 1]]
+
+(tc/transact conn [[:db/add [:issue/key "TPX-6"] :issue/status :status/closed]])
+
+(tc/take! !not-closed-sub)
+;; => [[["Flaky test in the bid pipeline"] -1]]
+
+;; When closing the flaky ticket, it leaves the "not-closed" set.
+
+;; TODO: replace with untriaged below
+#_
+(def untriaged-sub
+  (tc/subscribe conn '{:find [?title]
+                       :where [[?i :issue/title ?title]
+                               (not [?i :issue/label ?l])]}))
 
 ;; *AGGREGATES + OR-JOIN + NOT-JOIN*
 
