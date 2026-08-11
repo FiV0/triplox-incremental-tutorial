@@ -28,3 +28,5 @@ clojure -M:dev:nrepl --port 7888
 work in Triplox. We plan to add the tutorial for other client languages in the future.
 
 ### License
+
+Apache License, Version 2.0
