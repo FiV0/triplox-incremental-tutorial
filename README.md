@@ -22,4 +22,9 @@ To get an nREPL you can connect to
 clojure -M:dev:nrepl --port 7888
 ```
 
+### Tutorial
+
+[tutorial.clj](src/tutorial.clj) contains a REPL session you can follow along to get feel for how incremental queries
+work in Triplox. We plan to add the tutorial for other client languages in the future.
+
 ### License
