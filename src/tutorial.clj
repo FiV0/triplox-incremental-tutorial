@@ -1,5 +1,7 @@
 (ns tutorial
-  (:require [xyz.triplox.api :as tc]))
+  (:require [xyz.triplox.api :as tc]
+            [clojure.core.async :as async])
+  (:import (java.io Closeable)))
 
 (def conn (tc/connect "localhost" 5490))
 
@@ -271,3 +273,79 @@
 ;; --------------------------------------------------------------------------
 ;; Views
 ;; --------------------------------------------------------------------------
+
+;; We currently don't implement views server side. If there is a big demand for it
+;; we might add them some day server side. Here is an example of how you might implement
+;; them client side.
+
+(defn update-view [view-map inc-res]
+  (reduce (fn [view-map [tuple value]]
+            (let [new-val  (+ (get view-map tuple 0) value)]
+              (if-not (zero? new-val)
+                (assoc view-map tuple new-val)
+                (dissoc view-map tuple))))
+          view-map
+          inc-res))
+
+(defn update-view! [!view inc-res]
+  (swap! !view update-view inc-res))
+
+;; A worker that checks the subscription every 500ms and updates the view.
+(defn start-worker [sub !view]
+  (let [stop (async/chan)
+        done (async/chan)]
+    (async/go-loop []
+      (let [[_ ch] (async/alts! [stop (async/timeout 500)])]
+        (if (= ch stop)
+          (async/close! done)
+          (let [res (tc/take! sub 10)]
+            (when (not= res ::tc/timeout)
+              (update-view! !view res))
+            (recur)))))
+    {:stop stop :done done}))
+
+(defrecord View [sub view stop-chan done-chan]
+  Closeable
+  (close [_this]
+    (async/close! stop-chan)
+    (async/<!! done-chan)
+    (.close sub)))
+
+(defn ->view [conn q]
+  (let [sub (tc/subscribe conn q)
+        !view (atom {})
+        {:keys [stop done]} (start-worker sub !view)]
+    (->View sub !view stop done)))
+
+(defn get-view [{:keys [view]}]
+  (vec (keys @view)))
+
+;; creating a new view to get a new db
+(def conn (tc/connect "localhost" 5490))
+
+(tc/transact conn [{:db/ident :person/name
+                    :db/valueType :db.type/string
+                    :db/cardinality :db.cardinality/one
+                    :db/unique :db.unique/identity}
+                   {:db/ident :person/residence
+                    :db/valueType :db.type/string
+                    :db/cardinality :db.cardinality/one}])
+
+(tc/transact conn [{:person/name "Ada Lovelace"
+                    :person/residence "12 St. James's Square"}
+                   {:person/name "Alan Turing"
+                    :person/residence "Bletchley Park"}])
+
+(def residence-view (->view conn '{:find [?name ?residence]
+                                   :where [[?p :person/name ?name]
+                                           [?p :person/residence ?residence]]}))
+
+(get-view residence-view)
+;; => [["Ada Lovelace" "12 St. James's Square"]
+;;     ["Alan Turing" "Bletchley Park"]]
+
+(tc/transact conn [[:db/add [:person/name "Ada Lovelace"] :person/residence "Buckingham Palace"]])
+
+(get-view residence-view)
+;; => [["Alan Turing" "Bletchley Park"]
+;;     ["Ada Lovelace" "Buckingham Palace"]]
