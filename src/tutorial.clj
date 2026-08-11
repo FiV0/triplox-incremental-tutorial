@@ -49,9 +49,6 @@
    {:db/ident :issue/label
     :db/valueType :db.type/string
     :db/cardinality :db.cardinality/many}
-   {:db/ident :issue/blocks
-    :db/valueType :db.type/ref
-    :db/cardinality :db.cardinality/many}
 
    ;; status enum
    {:db/ident :status/open}
