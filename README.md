@@ -16,4 +16,10 @@ In case you want a persistent node, start the image with
 docker run -p 5490:5490 -e TRIPLOX_STORAGE=local -v triplox-data:/var/lib/triplox  ghcr.io/fiv0/triplox:0.1.0-alpha.7
 ```
 
-## License
+### REPL
+To get an nREPL you can connect to
+```bash
+clojure -M:dev:nrepl --port 7888
+```
+
+### License
