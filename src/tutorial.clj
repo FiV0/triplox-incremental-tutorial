@@ -265,10 +265,10 @@
                        :where [[?i :issue/title ?title]
                                (not [?i :issue/label ?l])]}))
 
-;; *AGGREGATES + OR-JOIN + NOT-JOIN*
+;; *AGGREGATES + OR-JOIN + NOT-JOIN + RULES*
 
 ;; TODO
-;; We currently don't support aggregates, or-join and not-join, but they will come.
+;; We currently don't support aggregates, or-join, not-join and rules but they will come to Triplox.
 
 ;; --------------------------------------------------------------------------
 ;; Views
