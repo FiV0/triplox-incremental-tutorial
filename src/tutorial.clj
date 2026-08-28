@@ -265,8 +265,22 @@
                        :where [[?i :issue/title ?title]
                                (not [?i :issue/label ?l])]}))
 
-;; *AGGREGATES + OR-JOIN + NOT-JOIN + RULES*
+;; *AGGREGATES*
 
+;; With aggregates in the find clause there will always be a change
+
+(def !issue-count-by-team+status
+  (tc/subscribe conn '{:find [?team-name ?status-name (count ?issue)]
+                       :where [[?issue :issue/assignee ?user]
+                               [?user :user/team ?team]
+                               [?team :team/name ?team-name]
+                               [?issue :issue/status ?status]
+                               [?status :db/ident ?status-name]]}))
+
+(tc/take! !issue-count-by-team+status)
+
+
+;; *OR-JOIN + NOT-JOIN + RULES*
 ;; TODO
 ;; We currently don't support aggregates, or-join, not-join and rules but they will come to Triplox.
 
