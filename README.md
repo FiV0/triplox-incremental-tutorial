@@ -7,13 +7,13 @@ Please check that the version below matches the [newest release](https://github.
 
 You first need a running docker image of Triplox
 ```bash
-docker pull ghcr.io/fiv0/triplox:0.1.0-alpha.7
-docker run -p 5490:5490 ghcr.io/fiv0/triplox:0.1.0-alpha.7
+docker pull ghcr.io/fiv0/triplox:0.1.0-alpha.8
+docker run -p 5490:5490 ghcr.io/fiv0/triplox:0.1.0-alpha.8
 ```
 
 In case you want a persistent node, start the image with
 ```bash
-docker run -p 5490:5490 -e TRIPLOX_STORAGE=local -v triplox-data:/var/lib/triplox  ghcr.io/fiv0/triplox:0.1.0-alpha.7
+docker run -p 5490:5490 -e TRIPLOX_STORAGE=local -v triplox-data:/var/lib/triplox  ghcr.io/fiv0/triplox:0.1.0-alpha.8
 ```
 
 ### REPL
