@@ -3,7 +3,7 @@
 This repository is a little incremental query tutorial for [Triplox](https://github.com/FiV0/triplox), an Datomic-like
 triplestore on top of [SlateDB](https://github.com/slatedb/slatedb).
 
-Please check that the version below matches the newest release of Triplox and replace it accordingly.
+Please check that the version below matches the [newest release](https://github.com/FiV0/triplox/pkgs/container/triplox) of Triplox and replace it accordingly.
 
 You first need a running docker image of Triplox
 ```bash
