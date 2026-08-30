@@ -76,27 +76,28 @@
                                [?user :user/team ?team]
                                [?team :team/name ?team-name]]}))
 
-(tc/transact conn
-             ;; teams
-             [{:db/id "team-frontend" :team/name "Frontend"}
-              {:db/id "team-backend" :team/name "Backend"}
+(def team-tx-key
+  (tc/transact conn
+               ;; teams
+               [{:db/id "team-frontend" :team/name "Frontend"}
+                {:db/id "team-backend" :team/name "Backend"}
 
-              ;; users
-              {:user/handle "ada"
-               :user/name   "Ada Lovelace"
-               :user/team   "team-frontend"}
-              {:user/handle "alan"
-               :user/name   "Alan Turing"
-               :user/team   "team-frontend"}
-              {:db/id "grace-tmpid"
-               :user/handle "grace"
-               :user/name   "Grace Hopper"}
-              ;; TODO: We don't support vector syntax for cardinality/many attributes yet.
-              [:db/add "grace-tmpid" :user/team "team-frontend"]
-              [:db/add "grace-tmpid" :user/team "team-backend"]
-              {:user/handle "edsger"
-               :user/name   "Edsger Dijkstra"
-               :user/team   "team-backend"}])
+                ;; users
+                {:user/handle "ada"
+                 :user/name   "Ada Lovelace"
+                 :user/team   "team-frontend"}
+                {:user/handle "alan"
+                 :user/name   "Alan Turing"
+                 :user/team   "team-frontend"}
+                {:db/id "grace-tmpid"
+                 :user/handle "grace"
+                 :user/name   "Grace Hopper"}
+                ;; TODO: We don't support vector syntax for cardinality/many attributes yet.
+                [:db/add "grace-tmpid" :user/team "team-frontend"]
+                [:db/add "grace-tmpid" :user/team "team-backend"]
+                {:user/handle "edsger"
+                 :user/name   "Edsger Dijkstra"
+                 :user/team   "team-backend"}]))
 
 ;; Ada Lovelace and Alan Turing are working on the Frontend team and
 ;; Dijkstra on the Backend team. Grace Hopper works on both teams.
@@ -267,7 +268,20 @@
 
 ;; *AGGREGATES*
 
-;; With aggregates in the find clause there will always be a change
+;; TODO Write the tutorial in such a way that we still have the Frontend and Backend team at this point.
+
+(def frontend-team-id
+  (ffirst (tc/q (tc/db conn team-tx-key)
+                '{:find [?team-eid]
+                  :where [[?team-eid :team/name "Frontend"]]})))
+
+;; Just so we have the Frontend team back (You know Database need analytics dashboards ...).
+
+(tc/transact conn [[:db/add frontend-team-id :team/name "Frontend"]])
+
+;; With an aggregate in the find clause there will always be a tuple that gets removed and a tuple
+;; that gets added when an aggregate changes. To illustrate incremental aggregate queries
+;; we are going to look at the number of tickets per team and status.
 
 (def !issue-count-by-team+status
   (tc/subscribe conn '{:find [?team-name ?status-name (count ?issue)]
@@ -277,12 +291,30 @@
                                [?issue :issue/status ?status]
                                [?status :db/ident ?status-name]]}))
 
-(tc/take! !issue-count-by-team+status)
 
+(tc/take! !issue-count-by-team+status)
+;; => [[["Backend" :status/closed 2] 1]
+;;     [["Backend" :status/open 1] 1]
+;;     [["Frontend" :status/closed 1] 1]
+;;     [["Frontend" :status/in-progress 2] 1]
+;;     [["Frontend" :status/open 2] 1]]
+
+;; Let's say ticket 6 gets closed.
+
+(tc/transact conn [[:db/add [:issue/key "TPX-6"] :issue/status :status/closed]])
+
+(tc/take! !issue-count-by-team+status)
+;; => [[["Frontend" :status/closed 2] 1]
+;;     [["Frontend" :status/closed 1] -1]
+;;     [["Frontend" :status/in-progress 2] -1]
+;;     [["Frontend" :status/in-progress 1] 1]]
+
+;; We can see that the ticket was assigned to the Frontend team and that the closed count got bumped from 1 to 2 where as
+;; the in-progress count got bumped from 2 to 1.
 
 ;; *OR-JOIN + NOT-JOIN + RULES*
 ;; TODO
-;; We currently don't support aggregates, or-join, not-join and rules but they will come to Triplox.
+;; We currently don't support or-join, not-join and rules but they will (eventually) come to Triplox.
 
 ;; --------------------------------------------------------------------------
 ;; Views
