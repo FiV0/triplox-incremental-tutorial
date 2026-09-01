@@ -345,7 +345,7 @@
         (if (= ch stop)
           (async/close! done)
           (do (loop [delta (tc/take! sub 10)]
-                (when (not= delta ::tc/timeout)
+                (when (and delta (not= delta ::tc/timeout))
                   (update-view! !view delta)
                   (recur (tc/take! sub 10))))
               (recur)))))
