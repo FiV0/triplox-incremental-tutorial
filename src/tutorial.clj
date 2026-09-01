@@ -341,13 +341,14 @@
   (let [stop (async/chan)
         done (async/chan)]
     (async/go-loop []
-      (let [[_ ch] (async/alts! [stop (async/timeout 500)])]
+      (let [[_ ch] (async/alts! [stop (async/timeout 300)])]
         (if (= ch stop)
           (async/close! done)
-          (let [res (tc/take! sub 10)]
-            (when (not= res ::tc/timeout)
-              (update-view! !view res))
-            (recur)))))
+          (do (loop [delta (tc/take! sub 10)]
+                (when (not= delta ::tc/timeout)
+                  (update-view! !view delta)
+                  (recur (tc/take! sub 10))))
+              (recur)))))
     {:stop stop :done done}))
 
 (defrecord View [sub view stop-chan done-chan]
