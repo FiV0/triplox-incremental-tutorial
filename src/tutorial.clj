@@ -193,7 +193,7 @@
 ;; => [[["Flaky test in the bid pipeline" "Alan Turing" 48] 1]
 ;;     [["Incremental joins allocate per delta" "Grace Hopper" 48] -1]]
 
-;; The flaky tests enters the and "incremental join allocations" exists the urgent tickets.
+;; The flaky tests enters and "incremental join allocations" exits the urgent tickets.
 
 ;; *OR*
 
