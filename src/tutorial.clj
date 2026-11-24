@@ -76,6 +76,10 @@
                                [?user :user/team ?team]
                                [?team :team/name ?team-name]]}))
 
+;; take an initial empty delta
+(tc/take! !user+team-sub 500)
+;; => []
+
 (def team-tx-key
   (tc/transact conn
                ;; teams
@@ -108,7 +112,6 @@
         :where [[?user :user/name ?user-name]
                 [?user :user/team ?team]
                 [?team :team/name ?team-name]]})
-
 ;; => [["Grace Hopper" "Frontend"]
 ;;     ["Grace Hopper" "Backend"]
 ;;     ["Edsger Dijkstra" "Backend"]
@@ -152,6 +155,9 @@
              [?assignee :user/name ?assignee-name]
              [(* ?priority 24) ?sla-hours]]}))
 
+;; empty initialization delta
+(tc/take! !urgent-issues-sub)
+
 (tc/transact conn
              [{:issue/key "TPX-1"
                :issue/title "Sync engine drops updates on reconnect"
@@ -186,8 +192,8 @@
 ;; The inc query initialization gives us the same results at the standard query. Let's say we
 ;; now prioritize the flake test and deprioritize the incremental join allocations.
 
-(tc/transact conn [[:db/add [:issue/key "issue-6"] :issue/priority 2]
-                   [:db/add [:issue/key "issue-3"] :issue/priority 4]])
+(tc/transact conn [[:db/add [:issue/key "TPX-6"] :issue/priority 2]
+                   [:db/add [:issue/key "TPX-3"] :issue/priority 4]])
 
 (tc/take! !urgent-issues-sub)
 ;; => [[["Flaky test in the bid pipeline" "Alan Turing" 48] 1]
@@ -275,13 +281,14 @@
                 '{:find [?team-eid]
                   :where [[?team-eid :team/name "Frontend"]]})))
 
-;; Just so we have the Frontend team back (You know Database need analytics dashboards ...).
+;; Just so we have the Frontend team back (You know, Databases need analytics dashboards ...).
 
 (tc/transact conn [[:db/add frontend-team-id :team/name "Frontend"]])
 
 ;; With an aggregate in the find clause there will always be a tuple that gets removed and a tuple
 ;; that gets added when an aggregate changes. To illustrate incremental aggregate queries
 ;; we are going to look at the number of tickets per team and status.
+;; As "Grace" is both in the Frontend and Backend team, some tickets will be counted multiple times
 
 (def !issue-count-by-team+status
   (tc/subscribe conn '{:find [?team-name ?status-name (count ?issue)]
@@ -291,30 +298,30 @@
                                [?issue :issue/status ?status]
                                [?status :db/ident ?status-name]]}))
 
-
 (tc/take! !issue-count-by-team+status)
 ;; => [[["Backend" :status/closed 2] 1]
 ;;     [["Backend" :status/open 1] 1]
-;;     [["Frontend" :status/closed 1] 1]
-;;     [["Frontend" :status/in-progress 2] 1]
+;;     [["Frontend" :status/closed 2] 1]
+;;     [["Frontend" :status/in-progress 1] 1]
 ;;     [["Frontend" :status/open 2] 1]]
 
-;; Let's say ticket 6 gets closed.
+;; Let's say ticket 1 gets closed.
 
-(tc/transact conn [[:db/add [:issue/key "TPX-6"] :issue/status :status/closed]])
+(tc/transact conn [[:db/add [:issue/key "TPX-1"] :issue/status :status/closed]])
 
 (tc/take! !issue-count-by-team+status)
-;; => [[["Frontend" :status/closed 2] 1]
-;;     [["Frontend" :status/closed 1] -1]
-;;     [["Frontend" :status/in-progress 2] -1]
-;;     [["Frontend" :status/in-progress 1] 1]]
+;; => [[["Frontend" :status/closed 3] 1]
+;;     [["Frontend" :status/closed 2] -1]
+;;     [["Frontend" :status/in-progress 1] -1]]
 
-;; We can see that the ticket was assigned to the Frontend team and that the closed count got bumped from 1 to 2 where as
-;; the in-progress count got bumped from 2 to 1.
+;; We can see that the ticket was assigned to the Frontend team and that the closed count got bumped from 2 to 3 where as
+;; the in-progress count left the result set.
 
-;; *OR-JOIN + NOT-JOIN + RULES*
+;; *OR-JOIN + NOT-JOIN *
 ;; TODO
-;; We currently don't support or-join, not-join and rules but they will (eventually) come to Triplox.
+
+;; * RULES *
+;; We currently don't support rules but they will (eventually) come to Triplox.
 
 ;; --------------------------------------------------------------------------
 ;; Views
